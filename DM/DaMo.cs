@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading;
 
 namespace DM
 {
@@ -55,7 +50,7 @@ namespace DM
             }
         }
 
-        public bool FindPic(Retangle retangle, string picPath)
+        public bool FindPic(PicRetangle retangle, string picPath)
         {
             int result = DMObeject.FindPic(retangle.x0, retangle.y0, retangle.x1, retangle.y1,
                 picPath, "000000", 0.9, 0, out object IntX, out object IntY);
@@ -72,11 +67,11 @@ namespace DM
         public bool SearchPic(string picPath)
         {
             //Retangle retangle = new Retangle(0, 0, width, height);
-            Retangle retangle = new Retangle(380, 135, 425, 170);
+            PicRetangle retangle = new PicRetangle(380, 135, 425, 170);
             return FindPic(retangle, picPath);
 
         }
-        public bool FindColor(Retangle retangle, string rgbColor)
+        public bool FindColor(PicRetangle retangle, string rgbColor)
         {
 
             int result = DMObeject.FindColor(retangle.x0, retangle.y0, retangle.x1, retangle.y1,
@@ -91,10 +86,10 @@ namespace DM
                 return false;
         }
 
-        public bool IFColor(int x, int y, string rgbColor)
+        public bool IFColor(PointInfo pointInfo)
         {
-            rgbColor.ToLower();
-            return rgbColor.Equals(DMObeject.GetColor(x, y).ToLower());
+            pointInfo.color.ToLower();
+            return pointInfo.color.Equals(DMObeject.GetColor(pointInfo.x, pointInfo.y).ToLower());
         }
 
         public void Click()
@@ -106,11 +101,24 @@ namespace DM
 
         public void MoveTo(int x, int y)
         {
+            DMObeject.SetWindowState(WindowHandle, 1);
+            Thread.Sleep(200);
             DMObeject.MoveTo(x, y);
         }
         public void MoveToFind()
         {
+            DMObeject.SetWindowState(WindowHandle, 1);
+            Thread.Sleep(200);
             DMObeject.MoveTo(FindX, FindY);
         }
+
+        public void Back()
+        {
+            DMObeject.SetWindowState(WindowHandle, 1);
+            Thread.Sleep(200);
+            DMObeject.KeyPress(27);
+        }
+
+       
     }
 }
