@@ -173,8 +173,10 @@ namespace DM
 
             //RunAppVar();
             StartDHXY();
+            SkipOP();
             ClickAccountLogin();
-            InputAccPw("bgippg4112", "ypbx0610");
+            ClickAgree();
+            InputAccPw("uebseo6134", "ypbx0610");
         }
 
         //判断某一区域的特征像素点
@@ -261,25 +263,42 @@ namespace DM
         {
             ExecuteADB("shell input keyevent HOME");
         }        
+        //跳过动画
+        private void SkipOP()
+        {
+            PicRetangle retangle = new PicRetangle(466, 368, 524, 391);
+            while (!DMThunder.FindPic(retangle, @"D:\Project\DM\DM\快速注册.bmp")) {
+                Thread.Sleep(1000);
+                Tap(45, 50);
+            }
+        }
 
-        //跳过动画直到登录界面,点击用账号密码登录
+        //点击用账号密码登录
         private void ClickAccountLogin()
         {
-            PicRetangle retangle = new PicRetangle(279, 377, 369, 400);
+            PicRetangle retangle = new PicRetangle(280, 377, 367, 399);
             if (DMThunder.FindPic(retangle, @"D:\Project\DM\DM\用账号登录.bmp"))
             {
                 Tap(315, 350);
             }
-            else
+        }
+
+        private void ClickAgree()
+        {
+            PicRetangle retangle = new PicRetangle(287, 338, 307, 354);
+            if (!DMThunder.FindPic(retangle, @"D:\Project\DM\DM\同意协议.bmp"))
             {
-                Thread.Sleep(1000);
-                Tap(315, 185);
-                ClickAccountLogin();
+                Tap(295, 308);
             }
         }
 
         private void InputAccPw(string account,string password)
         {
+            //清空账号密码
+            Tap(315, 185);
+            Thread.Sleep(500);
+            Tap(460, 175);
+
             Tap(315, 185);
             ExecuteADB("shell input text "+account);
 
@@ -290,16 +309,28 @@ namespace DM
             Tap(400, 270);
         }
 
+        private void ClickQR()
+        {
+            Tap(45, 225);
+            string frontActivity = ExecuteADB(ADBCommand.GetFrontActivity);
+            while (!frontActivity.Contains("CaptureActivity"))
+            {
+                Thread.Sleep(1000);
+                Tap(45, 225);
+            }
+
+
+        }
+
         private void read_account_Click(object sender, EventArgs e)
         {
             OpenFileDialog dialog = new OpenFileDialog();
             dialog.Multiselect = true;//该值确定是否可以选择多个文件
             dialog.Title = "请选择文件夹";
             dialog.Filter = "所有文件(*.*)|*.*";
-            string file = null;
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                file = dialog.FileName;
+                string file = dialog.FileName;
                 if (null != file)
                 {
                     FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read);
