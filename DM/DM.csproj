@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ADBCommand.cs" />
     <Compile Include="DaMo.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>

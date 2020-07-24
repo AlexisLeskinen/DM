@@ -39,8 +39,8 @@
             this.account_list = new System.Windows.Forms.ListView();
             this.column_account = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.column_password = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.read_account = new System.Windows.Forms.Button();
             this.column_status = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.read_account = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // start
@@ -142,6 +142,12 @@
             this.column_password.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.column_password.Width = 120;
             // 
+            // column_status
+            // 
+            this.column_status.Text = "状态";
+            this.column_status.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.column_status.Width = 120;
+            // 
             // read_account
             // 
             this.read_account.Location = new System.Drawing.Point(599, 116);
@@ -151,12 +157,6 @@
             this.read_account.Text = "导入账号";
             this.read_account.UseVisualStyleBackColor = true;
             this.read_account.Click += new System.EventHandler(this.read_account_Click);
-            // 
-            // column_status
-            // 
-            this.column_status.Text = "状态";
-            this.column_status.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            this.column_status.Width = 120;
             // 
             // MainForm
             // 

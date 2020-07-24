@@ -9,36 +9,33 @@ namespace DM
 {
     public partial class MainForm : Form
     {
-        Process cmdProcess;
-        ProcessStartInfo myProcessStartInfo;
+        Process ADB = new Process();
         private string configFile = "config.txt";
         private Dictionary<string, string> accounts = new Dictionary<string, string>();
-        private string adb;
 
         string thunderPath = @"D:\ChangZhi\dnplayer2\dnplayer.exe";
         Process thunderProcess = new Process();
-        DaMo DMThunder;
+        DaMo DMThunder = new DaMo();
 
         string DHXYPath = @"D:\Program Files (x86)\DHXY\XYPCLaunch.exe";
-
 
         public MainForm()
         {
             InitializeComponent();
-            //设置一下启动参数
-            myProcessStartInfo = new ProcessStartInfo();
-            myProcessStartInfo.UseShellExecute = false;
-            myProcessStartInfo.CreateNoWindow = true;
-            myProcessStartInfo.RedirectStandardInput = true;
-            myProcessStartInfo.RedirectStandardOutput = true;
-
-            cmdProcess = new Process();
-            AutoRegCom("regsvr32 -s dm.dll");
-
-            DMThunder = new DaMo();
         }
-
         private void MainForm_Load(object sender, EventArgs e)
+        {
+            ReadConfig();
+            //注册dll
+            RegisterDLL();
+            //设置ADB启动参数
+            ADB.StartInfo.UseShellExecute = false;
+            ADB.StartInfo.CreateNoWindow = true;
+            ADB.StartInfo.RedirectStandardInput = true;
+            ADB.StartInfo.RedirectStandardOutput = true;
+        }
+        //读取配置文件
+        private void ReadConfig()
         {
             FileStream fs = new FileStream(configFile, FileMode.OpenOrCreate, FileAccess.ReadWrite);
             StreamReader sr = new StreamReader(fs);
@@ -51,36 +48,61 @@ namespace DM
                 path_text_box.Text = thunderPath;
                 DHXY_text_box.Text = DHXYPath;
 
-                adb = Path.GetDirectoryName(thunderPath) + @"\adb.exe ";
+                ADB.StartInfo.FileName = Path.GetDirectoryName(thunderPath) + @"\adb.exe ";
             }
             sr.Close();
             fs.Close();
-
         }
+        //启动cmd注册dll
+        private void RegisterDLL()
+        {
+            //设置一cmd下启动参数
+            ProcessStartInfo PSI = new ProcessStartInfo
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                FileName = "cmd.exe",
+                //注册dm.dll
+                Arguments = "regsvr32 -s dm.dll"
+            };
+
+            Process CMD = new Process
+            {
+                StartInfo = PSI
+            };
+            CMD.Start();
+            //CMD.WaitForExit();
+            CMD.Close();
+        }
+        //执行单条ADB语句
+        private string ExecuteADB(string commad)
+        {
+            ADB.StartInfo.Arguments = commad;
+            ADB.Start();
+            string result = ADB.StandardOutput.ReadLine();
+            ADB.Close();
+            return result;
+        }
+
+
         private void start_Click(object sender, EventArgs e)
         {
             RunLightening();
         }
 
-        //注册DM.dll
-        private void AutoRegCom(string strCmd)
-        {
-            myProcessStartInfo.FileName = "cmd.exe";
-            cmdProcess.StartInfo = myProcessStartInfo;
-            myProcessStartInfo.Arguments = strCmd;
-            cmdProcess.Start();
-        }
+
         //启动雷电模拟器
         private void RunLightening()
         {
-            myProcessStartInfo.FileName = thunderPath;
-            thunderProcess.StartInfo = myProcessStartInfo;
+            thunderProcess.StartInfo.FileName = thunderPath;
             thunderProcess.Start();
 
             //睡几秒，等模拟器启动
             //然后绑定窗口     
             while (!DMThunder.BindWindow((int)thunderProcess.MainWindowHandle))
-                Thread.Sleep(2000);           
+                Thread.Sleep(2000);
         }
 
         private void MainForm_Closed(object sender, FormClosedEventArgs e)
@@ -95,7 +117,7 @@ namespace DM
             //关闭雷电模拟器
             //thunderProcess.CloseMainWindow();
             //thunderProcess.Close();
-            cmdProcess.Close();
+            ADB.Close();
         }
 
         private void BindThunder()
@@ -105,19 +127,27 @@ namespace DM
             while (!DMThunder.BindWindow("LDPlayerMainFrame", "雷电模拟器-1-"))
                 Thread.Sleep(2000);
 
-            cmdProcess.StandardInput.WriteLine(adb + "kill-server");
+            //ExecuteADB("kill-server");
+            //ExecuteADB("start-server");
         }
 
-        private bool RunAppVar()
+        private void RunAppVar()
         {
-            ClickAppVar();
+            StartAppVar();
 
-            PointInfo pointInfo = new PointInfo(20, 70, "3f51b5");
-            while (!DMThunder.IFColor(pointInfo))
-                Thread.Sleep(1000);                        
-
+            //等待进入应用变量主页面
             Thread.Sleep(1000);
-            ClickDHXY();
+            string frontActivity = ExecuteADB(ADBCommand.GetFrontActivity);
+            while (!frontActivity.Contains("xposed.hook.model"))
+            {
+                Thread.Sleep(1000);
+                frontActivity = ExecuteADB(ADBCommand.GetFrontActivity);
+            }
+
+            //获取当前运行界面
+            frontActivity = ExecuteADB(ADBCommand.GetFrontActivity);
+            if (!frontActivity.Contains("DetailActivity"))
+                ClickDHXY();
             Thread.Sleep(1000);
             ClickAdd();
             Thread.Sleep(500);
@@ -127,9 +157,9 @@ namespace DM
             Thread.Sleep(500);
             ClickKillAll();
             Thread.Sleep(500);
-            ClickRun();
+            ClickAdd();
 
-            return true;
+            Home();
         }
 
         private void WaitForForm()
@@ -141,7 +171,10 @@ namespace DM
         {
             BindThunder();
 
-            RunAppVar();
+            //RunAppVar();
+            StartDHXY();
+            ClickAccountLogin();
+            InputAccPw("bgippg4112", "ypbx0610");
         }
 
         //判断某一区域的特征像素点
@@ -160,96 +193,101 @@ namespace DM
             }
             return success;
         }
-        //调用adb点击，并判断
-        private
+        //调用adb点击，并判断点击后要检查的像素点
+        private void Tap(int x, int y, PointInfo checkPoint = null)
+        {
+            string str = "shell input tap " + x.ToString() + " " + y.ToString();
+            ExecuteADB(str);
+
+            Thread.Sleep(500);
+            if (null != checkPoint)
+                while (!DMThunder.IFColor(checkPoint))
+                    Thread.Sleep(1000);
+        }
 
         //打开应用变量
-        private void ClickAppVar()
+        private void StartAppVar()
         {
-            //PicRetangle retangle = new PicRetangle(380, 135, 425, 170);
-            //PointInfo pointInfo = new PointInfo(20, 70, "3f51b5");
-            //return TurnTo(retangle, "1f61ca", pointInfo);
-            cmdProcess.StandardInput.WriteLine(adb + 
-                "shell am start -n com.sollyu.xposed.hook.model/com.sollyu.xposed.hook.model.MainActivity");
+            //通过adb命令启动app
+            //需要花费几秒
+            ExecuteADB("shell am start -n com.sollyu.xposed.hook.model/com.sollyu.xposed.hook.model.MainActivity");
         }
         //点击大话西游
-        private bool ClickDHXY()
+        private void ClickDHXY()
         {
             //PicRetangle retangle = new PicRetangle(20, 130, 50, 155);
-            cmdProcess.StandardInput.WriteLine(adb +
-                "shell input tap 33 110");
             PointInfo pointInfo = new PointInfo(741, 453, "ffffff");
-
-            while (!DMThunder.IFColor(pointInfo))
-                Thread.Sleep(1000);
-
-            return true;
+            Tap(33, 100, pointInfo);
         }
         //点击加号
-        private bool ClickAdd()
+        private void ClickAdd()
         {
-            PicRetangle retangle = new PicRetangle(738, 450, 747, 460);
-            PointInfo pointInfo = new PointInfo(741, 453, "ffffff");
-            return TurnTo(retangle, "ffffff", pointInfo);
+            Tap(740, 420);
         }
         //点击全部随机
-        private bool ClickRandom()
+        private void ClickRandom()
         {
-            PicRetangle retangle = new PicRetangle(733, 164, 752, 189);
-            return TurnTo(retangle, "ffffff", null);
+            Tap(740, 120);
         }
         //点击保存设置
-        private bool ClickSave()
+        private void ClickSave()
         {
-            PicRetangle retangle = new PicRetangle(733, 383, 751, 404);
-            return TurnTo(retangle, "ffb805", null);
+            Tap(740, 360);
         }
         //点击杀死进程
-        private bool ClickKillAll()
+        private void ClickKillAll()
         {
-            PicRetangle retangle = new PicRetangle(738, 333, 746, 344);
-            return TurnTo(retangle, "da4338", null);
+            Tap(740, 300);
         }
-
+        //设置雷电模拟器路径
         private void path_button_Click(object sender, EventArgs e)
         {
             thunderPath = path_text_box.Text;
-            adb = Path.GetDirectoryName(thunderPath) + @"\adb.exe ";
+            ADB.StartInfo.FileName = Path.GetDirectoryName(thunderPath) + @"\adb.exe ";
         }
-
+        //设置电脑大话西游路径
         private void DHXY_button_Click(object sender, EventArgs e)
         {
             DHXYPath = DHXY_text_box.Text;
         }
 
         //点击启动
-        private bool ClickRun()
+        private void StartDHXY()
         {
-            PicRetangle retangle = new PicRetangle(736, 224, 746, 237);
-            return TurnTo(retangle, "1565c0", null);
+            ExecuteADB("shell am start -n com.netease.dhxy.qihoo/org.cocos2dx.lua.AppActivity");
         }
         //返回
-        private void Back()
+        private void Home()
         {
-            DMThunder.Back();
-        }
-        //点击用账号密码登录
+            ExecuteADB("shell input keyevent HOME");
+        }        
+
+        //跳过动画直到登录界面,点击用账号密码登录
         private void ClickAccountLogin()
         {
             PicRetangle retangle = new PicRetangle(279, 377, 369, 400);
             if (DMThunder.FindPic(retangle, @"D:\Project\DM\DM\用账号登录.bmp"))
             {
-                DMThunder.MoveToFind();
-                DMThunder.Click();
+                Tap(315, 350);
             }
             else
             {
-                DMThunder.MoveTo(100, 100);
-                DMThunder.Click();
                 Thread.Sleep(1000);
+                Tap(315, 185);
                 ClickAccountLogin();
-
             }
+        }
+
+        private void InputAccPw(string account,string password)
+        {
+            Tap(315, 185);
+            ExecuteADB("shell input text "+account);
+
+            Tap(315, 215);
+            ExecuteADB("shell input text "+password);
+
+            //点击登录
+            Tap(400, 270);
         }
 
         private void read_account_Click(object sender, EventArgs e)
