@@ -8,6 +8,8 @@ namespace DM
 {
     public static class ADBCommand
     {
-       public static string GetFrontActivity = "shell dumpsys window | grep mCurrentFocus";
+        public static string GetFrontActivity = "shell dumpsys window | grep mCurrentFocus";
+        public static string StopADB = "kill-server";
+        public static string StartADB = "start-server";
     }
 }

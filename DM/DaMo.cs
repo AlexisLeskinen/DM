@@ -28,21 +28,27 @@ namespace DM
         //根据进程ID绑定窗口
         public bool BindWindow(int processID)
         {
+            if (0 == processID) return false;
+
             int result = DMObeject.BindWindow(processID, "normal", "normal", "normal", 0);
+            if (0 == result) return false;
             WindowHandle = DMObeject.FindWindowByProcessId(processID, "", "");
             SetHW();
-            return 1 == result;
+            return true;
         }
         public bool BindWindow(string className, string windowsName)
         {
             WindowHandle = DMObeject.FindWindow(className, windowsName);
+            if (0 == WindowHandle) return false;
             int result = DMObeject.BindWindow(WindowHandle, "normal", "normal", "normal", 0);
             SetHW();
             return 1 == result;
         }
+        //获取当前窗口的宽高信息
         private void SetHW()
         {
-            int result = DMObeject.GetWindowRect(WindowHandle, out object IntX0, out object IntY0, out object IntX1, out object IntY1);
+            int result = DMObeject.GetWindowRect(WindowHandle, 
+                out object IntX0, out object IntY0, out object IntX1, out object IntY1);
             if (1 == result)
             {
                 height = (int)IntY1 - (int)IntY0;
@@ -101,24 +107,39 @@ namespace DM
 
         public void MoveTo(int x, int y)
         {
-            DMObeject.SetWindowState(WindowHandle, 1);
+            ActiveWindows();
             Thread.Sleep(200);
             DMObeject.MoveTo(x, y);
         }
         public void MoveToFind()
         {
-            DMObeject.SetWindowState(WindowHandle, 1);
+            ActiveWindows();
             Thread.Sleep(200);
             DMObeject.MoveTo(FindX, FindY);
         }
 
-        public void Back()
+       public void ActiveWindows()
         {
             DMObeject.SetWindowState(WindowHandle, 1);
-            Thread.Sleep(200);
-            DMObeject.KeyPress(27);
         }
 
+        public void ScanQR(DaMo dm)
+        {
+            DMObeject.GetWindowRect(WindowHandle,
+                out object IntX0, out object IntY0, out object IntX1, out object IntY1);
+
+            int aimX = (int)IntX0+340;
+            int aimY = (int)IntY0+250;
+            DMObeject.MoveWindow(dm.WindowHandle, aimX, aimY);
+
+            Thread.Sleep(500);
+            dm.MoveTo(10, 10);
+            dm.DMObeject.RightDown();
+            dm.MoveTo(10, 9);
+            dm.DMObeject.RightUp();
+
+            //dm.DMObeject.SetWindowSize(dm.WindowHandle, 400, 400);
+        }
        
     }
 }
