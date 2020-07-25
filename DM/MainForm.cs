@@ -17,10 +17,12 @@ namespace DM
         string thunderPath = @"D:\ChangZhi\dnplayer2\dnplayer.exe";
         Process thunderProcess = new Process();
         DaMo DMThunder = new DaMo();
+        private bool thunder = false;
 
         string DHXYPath = @"D:\Program Files (x86)\DHXY\XYPCLaunch.exe";
         Process DHXYProcess = new Process();
         DaMo DMDHXY = new DaMo();
+        private bool dhxy = false;
 
         string APPath = @"D:\Project\DM\DM\360.txt";
         private bool running = false;
@@ -58,8 +60,8 @@ namespace DM
                 DHXY_text_box.Text = DHXYPath;
 
                 ADB.StartInfo.FileName = Path.GetDirectoryName(thunderPath) + @"\adb.exe ";
-                Task E = new Task(ReadAP);
-                E.Start();
+                if (null != APPath && !APPath.Equals(""))
+                    ReadAP();
             }
             sr.Close();
             fs.Close();
@@ -110,8 +112,8 @@ namespace DM
         private void RunLightening()
         {
             thunderProcess.StartInfo.FileName = thunderPath;
-           
             thunderProcess.Start();
+            thunder = true;
 
             //睡几秒，等模拟器启动
             //然后绑定窗口     
@@ -122,8 +124,9 @@ namespace DM
         private void RunDHXY()
         {
             DHXYProcess.StartInfo.FileName = DHXYPath;
-           // DHXYProcess.StartInfo.Verb = "RunAs";
+            DHXYProcess.StartInfo.Verb = "RunAs";
             DHXYProcess.Start();
+            dhxy = true;
 
             //睡几秒，等模拟器启动
             //然后绑定窗口     
@@ -138,14 +141,21 @@ namespace DM
             StreamWriter sw = new StreamWriter(fs);
             sw.WriteLine(thunderPath);
             sw.WriteLine(DHXYPath);
+            sw.WriteLine(APPath);
             sw.Close();
             fs.Close();
 
             //关闭雷电模拟器与大话西游
-            thunderProcess.Kill();
-            thunderProcess.Close();
-            DHXYProcess.Kill();
-            DHXYProcess.Close();
+            if (thunder)
+            {
+                thunderProcess.Kill();
+                thunderProcess.Close();
+            }
+            //if (dhxy)
+            //{
+            //    DHXYProcess.Kill();
+            //    DHXYProcess.Close();
+            //}
             ADB.Close();
         }
         //绑定雷电模拟器窗口
@@ -169,7 +179,7 @@ namespace DM
         }
         private bool FrontActivityIs(string activity)
         {
-          return ExecuteADB(ADBCommand.GetFrontActivity).Contains(activity);
+            return ExecuteADB(ADBCommand.GetFrontActivity).Contains(activity);
         }
         //运行应用变量并设置
         private void RunAppVar()
@@ -178,8 +188,8 @@ namespace DM
 
             //等待进入应用变量主页面
             Thread.Sleep(1000);
-            while (!FrontActivityIs("xposed.hook.model"))            
-                Thread.Sleep(1000);           
+            while (!FrontActivityIs("xposed.hook.model"))
+                Thread.Sleep(1000);
 
             //获取当前运行界面
             if (FrontActivityIs("DetailActivity"))
@@ -198,7 +208,7 @@ namespace DM
             Home();
         }
         //运行大话西游APP
-        private void RunDHXYApp(string account,string password)
+        private void RunDHXYApp(string account, string password)
         {
             StartDHXYApp();
             SkipOP();
@@ -231,7 +241,10 @@ namespace DM
 
                 //等待模拟器进入桌面
                 while (!FrontActivityIs("launcher3"))
+                {
                     Thread.Sleep(1000);
+                    ExecuteADB(ADBCommand.StartADB);
+                }
 
                 RunAppVar();
                 RunDHXYApp(item.Key, item.Value);
@@ -239,6 +252,7 @@ namespace DM
 
                 thunderProcess.Kill();
                 DHXYProcess.Kill();
+                ExecuteADB(ADBCommand.StopADB);
             }
         }
 
@@ -439,6 +453,7 @@ namespace DM
         private void stop_button_Click(object sender, EventArgs e)
         {
             running = false;
+            T.Dispose();
         }
     }
 }
