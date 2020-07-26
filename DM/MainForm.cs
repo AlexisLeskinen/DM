@@ -25,6 +25,7 @@ namespace DM
         private bool dhxy = false;
 
         string APPath = @"D:\Project\DM\DM\360.txt";
+        string RSPath = @"D:\Project\DM\DM\";
         private bool running = false;
         Task T;
         public MainForm()
@@ -35,7 +36,7 @@ namespace DM
         {
             ReadConfig();
             //注册dll
-            RegisterDLL();
+            ExecuteCMD("regsvr32 -s dm.dll");
             //设置ADB启动参数
             ADB.StartInfo.UseShellExecute = false;
             ADB.StartInfo.CreateNoWindow = true;
@@ -43,6 +44,7 @@ namespace DM
             ADB.StartInfo.RedirectStandardOutput = true;
 
             T = new Task(LoopScript);
+            CheckForIllegalCrossThreadCalls = false;
         }
         //读取配置文件
         private void ReadConfig()
@@ -67,7 +69,7 @@ namespace DM
             fs.Close();
         }
         //启动cmd注册dll
-        private void RegisterDLL()
+        private void ExecuteCMD(string argumnet)
         {
             //设置一cmd下启动参数
             ProcessStartInfo PSI = new ProcessStartInfo
@@ -78,7 +80,7 @@ namespace DM
                 RedirectStandardOutput = true,
                 FileName = "cmd.exe",
                 //注册dm.dll
-                Arguments = "regsvr32 -s dm.dll"
+                Arguments = argumnet
             };
 
             Process CMD = new Process
@@ -86,7 +88,6 @@ namespace DM
                 StartInfo = PSI
             };
             CMD.Start();
-            //CMD.WaitForExit();
             CMD.Close();
         }
         //执行单条ADB语句
@@ -119,19 +120,19 @@ namespace DM
             //然后绑定窗口     
             while (!DMThunder.BindWindow((int)thunderProcess.MainWindowHandle))
                 Thread.Sleep(2000);
+
+            DMThunder.MoveWindowsRT();
         }
         //启动大话西游
         private void RunDHXY()
         {
             DHXYProcess.StartInfo.FileName = DHXYPath;
-            DHXYProcess.StartInfo.Verb = "RunAs";
+            DHXYProcess.StartInfo.WorkingDirectory = Path.GetDirectoryName(DHXYPath);
             DHXYProcess.Start();
             dhxy = true;
 
-            //睡几秒，等模拟器启动
-            //然后绑定窗口     
-            while (!DMDHXY.BindWindow((int)DHXYProcess.MainWindowHandle))
-                Thread.Sleep(2000);
+            BindDHXY();
+            DMDHXY.MoveWindowsLT();
         }
 
         private void MainForm_Closed(object sender, FormClosedEventArgs e)
@@ -147,15 +148,11 @@ namespace DM
 
             //关闭雷电模拟器与大话西游
             if (thunder)
-            {
-                thunderProcess.Kill();
-                thunderProcess.Close();
-            }
-            //if (dhxy)
-            //{
-            //    DHXYProcess.Kill();
-            //    DHXYProcess.Close();
-            //}
+                CloseThunder();
+
+            if (dhxy)
+                CloseDHXY();
+
             ADB.Close();
         }
         //绑定雷电模拟器窗口
@@ -176,10 +173,14 @@ namespace DM
 
             while (!DMDHXY.BindWindow("大话西游手游", "大话西游手游"))
                 Thread.Sleep(2000);
+
+            DMDHXY.SetWindowsSize(1000, 789);
         }
         private bool FrontActivityIs(string activity)
         {
-            return ExecuteADB(ADBCommand.GetFrontActivity).Contains(activity);
+            string reuslt = ExecuteADB(ADBCommand.GetFrontActivity);
+            return null != reuslt
+                && reuslt.Contains(activity);
         }
         //运行应用变量并设置
         private void RunAppVar()
@@ -192,17 +193,17 @@ namespace DM
                 Thread.Sleep(1000);
 
             //获取当前运行界面
-            if (FrontActivityIs("DetailActivity"))
+            if (!FrontActivityIs("DetailActivity"))
                 ClickDHXY();
-            Thread.Sleep(1000);
+            Thread.Sleep(2000);
             ClickAdd();
-            Thread.Sleep(500);
+            Thread.Sleep(800);
             ClickRandom();
-            Thread.Sleep(500);
+            Thread.Sleep(800);
             ClickSave();
-            Thread.Sleep(500);
+            Thread.Sleep(800);
             ClickKillAll();
-            Thread.Sleep(500);
+            Thread.Sleep(800);
             ClickAdd();
 
             Home();
@@ -223,43 +224,64 @@ namespace DM
             BindThunder();
             BindDHXY();
 
-            if (!running)
-            {
-                Task E = new Task(ClickQR);
-                E.Start();
-                running = true;
-            }
+            Task temp = new Task(ScanQR);
+            temp.Start();
+            //DMDHXY.CloseWindows();
+            //DHXYProcess.Close();
+
         }
 
         private void LoopScript()
         {
+            int index = 0;
             foreach (KeyValuePair<string, string> item in accounts)
             {
                 if (!running) break;
-                RunLightening();
-                RunDHXY();
-
+                Task startTH = new Task(RunLightening);
+                startTH.Start();
+                Task startDH = new Task(RunDHXY);
+                startDH.Start();
                 //等待模拟器进入桌面
                 while (!FrontActivityIs("launcher3"))
                 {
-                    Thread.Sleep(1000);
+                    if (FrontActivityIs("error"))
+                        ExecuteADB(ADBCommand.StopADB);
+                    Thread.Sleep(2000);
                     ExecuteADB(ADBCommand.StartADB);
                 }
 
                 RunAppVar();
                 RunDHXYApp(item.Key, item.Value);
 
+                CloseThunder();
+                DMThunder.UnBind();
 
-                thunderProcess.Kill();
-                DHXYProcess.Kill();
-                ExecuteADB(ADBCommand.StopADB);
+                Thread.Sleep(8000);
+                StartGame();
+
+                Thread.Sleep(10000);
+                PicRetangle retangle = new PicRetangle(428, 594, 576, 628);
+                if (!DMDHXY.FindPic(retangle, RSPath + "确定选择.bmp"))
+                {
+                    Thread.Sleep(1000);
+                    CreateRole();
+                }
+
+
+                CloseDHXY();
+                DMDHXY.UnBind();
+
+                account_list.Items[index].SubItems[2].Text = "已完成";
+                index++;
+
+                Thread.Sleep(4000);
             }
         }
 
         //调用adb点击，并判断点击后要检查的像素点
         private void Tap(int x, int y, PointInfo checkPoint = null)
         {
-            string str = "shell input tap " + x.ToString() + " " + y.ToString();
+            string str = string.Format("shell input tap {0} {1}", x, y);
             ExecuteADB(str);
 
             Thread.Sleep(500);
@@ -327,7 +349,7 @@ namespace DM
         private void SkipOP()
         {
             PicRetangle retangle = new PicRetangle(466, 368, 524, 391);
-            while (!DMThunder.FindPic(retangle, @"D:\Project\DM\DM\快速注册.bmp"))
+            while (!DMThunder.FindPic(retangle, RSPath + "快速注册.bmp"))
             {
                 Thread.Sleep(1000);
                 Tap(45, 50);
@@ -338,7 +360,7 @@ namespace DM
         private void ClickAccountLogin()
         {
             PicRetangle retangle = new PicRetangle(280, 377, 367, 399);
-            if (DMThunder.FindPic(retangle, @"D:\Project\DM\DM\用账号登录.bmp"))
+            if (DMThunder.FindPic(retangle, RSPath + "用账号登录.bmp"))
             {
                 Tap(315, 350);
             }
@@ -347,7 +369,7 @@ namespace DM
         private void ClickAgree()
         {
             PicRetangle retangle = new PicRetangle(287, 338, 307, 354);
-            if (!DMThunder.FindPic(retangle, @"D:\Project\DM\DM\同意协议.bmp"))
+            if (!DMThunder.FindPic(retangle, RSPath + "同意协议.bmp"))
             {
                 Tap(295, 308);
             }
@@ -372,12 +394,12 @@ namespace DM
 
         private void ClickQR()
         {
-            Tap(45, 225);
-            while (!FrontActivityIs("CaptureActivity"))
+            do
             {
-                Thread.Sleep(1000);
                 Tap(45, 225);
-            }
+                Thread.Sleep(3000);
+            } while (!FrontActivityIs("CaptureActivity"));
+
 
             Thread.Sleep(1000);
             ScanQR();
@@ -389,23 +411,65 @@ namespace DM
             while (!damo.BindWindow("TrayNoticeWindow", ""))
                 Thread.Sleep(500);
             damo.MoveTo(100, 110);
-            damo.Click();
             Thread.Sleep(500);
+            damo.Click();
+            damo.UnBind();
+            Thread.Sleep(2000);
 
             while (!damo.BindWindow("ldScreenshotWindow", ""))
                 Thread.Sleep(500);
 
             PicRetangle retangle = new PicRetangle(372, 326, 507, 421);
-            if (DMDHXY.FindPic(retangle, @"D:\Project\DM\DM\二维码.bmp"))
+            if (DMDHXY.FindPic(retangle, RSPath + "二维码.bmp"))
             {
                 DMDHXY.ActiveWindows();
                 DMDHXY.ScanQR(damo);
 
                 retangle = new PicRetangle(351, 234, 558, 346);
-                while (!DMThunder.FindPic(retangle, @"D:\Project\DM\DM\确定扫描登录.bmp"))
+                while (!DMThunder.FindPic(retangle, RSPath + "确定扫描登录.bmp"))
                     Thread.Sleep(1000);
                 Tap(480, 290);
             }
+        }
+
+        private void StartGame()
+        {
+            PicRetangle retangle = new PicRetangle(390, 602, 685, 681);
+            if (DMDHXY.FindPic(retangle, RSPath + "开始游戏.bmp"))
+            {
+                DMDHXY.MoveToFind();
+                Thread.Sleep(500);
+                DMDHXY.Click();
+            }
+        }
+
+        private void CreateRole()
+        {
+
+            PicRetangle retangle = new PicRetangle(805, 718, 933, 752);
+            if (DMDHXY.FindPic(retangle, RSPath + "创建角色.bmp"))
+            {
+                DMDHXY.MoveToFind();
+                Thread.Sleep(500);
+                DMDHXY.Click();
+
+                retangle = new PicRetangle(805, 718, 933, 752);
+                while (DMDHXY.FindPic(retangle, RSPath + "老玩家.bmp"))
+                    Thread.Sleep(1000);
+            }
+        }
+        private void CloseThunder()
+        {
+            thunderProcess.Kill();
+            thunderProcess.Close();
+            thunder = false;
+        }
+
+        private void CloseDHXY()
+        {
+            DMDHXY.CloseWindows();
+            DHXYProcess.Close();
+            dhxy = false;
         }
 
         private void read_account_Click(object sender, EventArgs e)
@@ -446,14 +510,13 @@ namespace DM
             //更新账号列表
             foreach (KeyValuePair<string, string> item in accounts)
             {
-                account_list.Items.Add(new ListViewItem(new string[] { item.Key, item.Value }));
+                account_list.Items.Add(new ListViewItem(new string[] { item.Key, item.Value, "" }));
             }
         }
 
         private void stop_button_Click(object sender, EventArgs e)
         {
             running = false;
-            T.Dispose();
         }
     }
 }
