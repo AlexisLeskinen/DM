@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -12,7 +13,7 @@ namespace DM
     {
         Process ADB = new Process();
         private string configFile = "config.txt";
-        private Dictionary<string, string> accounts = new Dictionary<string, string>();
+        private Dictionary<string, string> Accounts = new Dictionary<string, string>();
 
         string thunderPath = @"D:\ChangZhi\dnplayer2\dnplayer.exe";
         Process thunderProcess = new Process();
@@ -25,9 +26,10 @@ namespace DM
         private bool dhxy = false;
 
         string APPath = @"D:\Project\DM\DM\360.txt";
-        string RSPath = @"D:\Project\DM\DM\";
+        string RSPath = @".\RS\";
         private bool running = false;
-        Task T;
+
+        int SelectedIndex = -1;
         public MainForm()
         {
             InitializeComponent();
@@ -43,7 +45,7 @@ namespace DM
             ADB.StartInfo.RedirectStandardInput = true;
             ADB.StartInfo.RedirectStandardOutput = true;
 
-            T = new Task(LoopScript);
+
             CheckForIllegalCrossThreadCalls = false;
         }
         //读取配置文件
@@ -58,8 +60,8 @@ namespace DM
                 DHXYPath = sr.ReadLine();
                 APPath = sr.ReadLine();
 
-                path_text_box.Text = thunderPath;
-                DHXY_text_box.Text = DHXYPath;
+                TextBox_Thunder_Path.Text = thunderPath;
+                TextBox_DHXY_Path.Text = DHXYPath;
 
                 ADB.StartInfo.FileName = Path.GetDirectoryName(thunderPath) + @"\adb.exe ";
                 if (null != APPath && !APPath.Equals(""))
@@ -101,11 +103,11 @@ namespace DM
         }
 
         //启动脚本
-        private void start_Click(object sender, EventArgs e)
+        private void Button_Start_Click(object sender, EventArgs e)
         {
             if (!running)
             {
-                T.Start();
+                Task.Run(() => LoopScript());
                 running = true;
             }
         }
@@ -116,10 +118,7 @@ namespace DM
             thunderProcess.Start();
             thunder = true;
 
-            //睡几秒，等模拟器启动
-            //然后绑定窗口     
-            while (!DMThunder.BindWindow((int)thunderProcess.MainWindowHandle))
-                Thread.Sleep(2000);
+            BindThunder();
 
             DMThunder.MoveWindowsRT();
         }
@@ -162,19 +161,16 @@ namespace DM
 
             while (!DMThunder.BindWindow("LDPlayerMainFrame", "雷电模拟器-1-"))
                 Thread.Sleep(2000);
-
-            ExecuteADB(ADBCommand.StopADB);
-            ExecuteADB(ADBCommand.StartADB);
         }
         //绑定大话西游窗口
         private void BindDHXY()
         {
             if (DMDHXY.IsBind()) return;
 
-            while (!DMDHXY.BindWindow("大话西游手游", "大话西游手游"))
+            while (!DMDHXY.BindWindow("大话西游手游", "大话西游手游", "normal"))
                 Thread.Sleep(2000);
 
-            DMDHXY.SetWindowsSize(1000, 789);
+            DMDHXY.ActiveWindows();
         }
         private bool FrontActivityIs(string activity)
         {
@@ -219,63 +215,74 @@ namespace DM
             ClickQR();
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void Button_Test_Click(object sender, EventArgs e)
         {
             BindThunder();
             BindDHXY();
 
-            Task temp = new Task(ScanQR);
-            temp.Start();
-            //DMDHXY.CloseWindows();
-            //DHXYProcess.Close();
+            Task.Run(() =>
+            {
+                ClickQR();
+                Thread.Sleep(8000);
+                //StartGame();
 
+                //Thread.Sleep(12000);
+                //PicRetangle retangle = new PicRetangle(428, 594, 576, 628);
+                //if (!DMDHXY.FindPic(retangle, RSPath + "确定选择.bmp"))
+                //{
+                //    Thread.Sleep(1000);
+                //    CreateRole();
+                //}
+            });
         }
 
         private void LoopScript()
         {
-            int index = 0;
-            foreach (KeyValuePair<string, string> item in accounts)
+            for (int i = 0; i < Accounts.Count; i++)
             {
                 if (!running) break;
-                Task startTH = new Task(RunLightening);
-                startTH.Start();
-                Task startDH = new Task(RunDHXY);
-                startDH.Start();
-                //等待模拟器进入桌面
-                while (!FrontActivityIs("launcher3"))
-                {
-                    if (FrontActivityIs("error"))
-                        ExecuteADB(ADBCommand.StopADB);
-                    Thread.Sleep(2000);
-                    ExecuteADB(ADBCommand.StartADB);
-                }
-
-                RunAppVar();
-                RunDHXYApp(item.Key, item.Value);
-
-                CloseThunder();
-                DMThunder.UnBind();
-
-                Thread.Sleep(8000);
-                StartGame();
-
-                Thread.Sleep(10000);
-                PicRetangle retangle = new PicRetangle(428, 594, 576, 628);
-                if (!DMDHXY.FindPic(retangle, RSPath + "确定选择.bmp"))
-                {
-                    Thread.Sleep(1000);
-                    CreateRole();
-                }
-
-
-                CloseDHXY();
-                DMDHXY.UnBind();
-
-                account_list.Items[index].SubItems[2].Text = "已完成";
-                index++;
-
+                SingleProcess(i);
                 Thread.Sleep(4000);
             }
+        }
+
+        private void SingleProcess(int Index)
+        {
+            Task.Run(() => RunLightening());
+            Task.Run(() => RunDHXY());
+
+            string account = ListView_Account.Items[Index].SubItems[0].Text;
+            string password = ListView_Account.Items[Index].SubItems[1].Text;
+            //等待模拟器进入桌面
+            while (!FrontActivityIs("launcher3"))
+            {
+                if (FrontActivityIs("error"))
+                    ExecuteADB(ADBCommand.StopADB);
+                Thread.Sleep(2000);
+                ExecuteADB(ADBCommand.StartADB);
+            }
+
+            RunAppVar();
+            RunDHXYApp(account, password);
+
+            CloseThunder();
+            DMThunder.UnBind();
+
+            Thread.Sleep(8000);
+            StartGame();
+
+            Thread.Sleep(12000);
+            PicRetangle retangle = new PicRetangle(428, 594, 576, 628);
+            if (!DMDHXY.FindPic(retangle, RSPath + "确定选择.bmp"))
+            {
+                Thread.Sleep(1000);
+                CreateRole();
+            }
+
+            CloseDHXY();
+            DMDHXY.UnBind();
+
+            ListView_Account.Items[Index].SubItems[2].Text = "已完成";
         }
 
         //调用adb点击，并判断点击后要检查的像素点
@@ -326,13 +333,13 @@ namespace DM
         //设置雷电模拟器路径
         private void path_button_Click(object sender, EventArgs e)
         {
-            thunderPath = path_text_box.Text;
+            thunderPath = TextBox_Thunder_Path.Text;
             ADB.StartInfo.FileName = Path.GetDirectoryName(thunderPath) + @"\adb.exe ";
         }
         //设置电脑大话西游路径
-        private void DHXY_button_Click(object sender, EventArgs e)
+        private void Button_Set_DHXY_Click(object sender, EventArgs e)
         {
-            DHXYPath = DHXY_text_box.Text;
+            DHXYPath = TextBox_DHXY_Path.Text;
         }
 
         //点击启动
@@ -343,7 +350,7 @@ namespace DM
         //返回
         private void Home()
         {
-            ExecuteADB("shell input keyevent HOME");
+            ExecuteADB(ADBCommand.BackHome);
         }
         //跳过动画
         private void SkipOP()
@@ -391,71 +398,103 @@ namespace DM
             //点击登录
             Tap(400, 270);
         }
-
+        DaMo damo;
+        int ScannerHWD = 0;
         private void ClickQR()
         {
-            do
-            {
-                Tap(45, 225);
-                Thread.Sleep(3000);
-            } while (!FrontActivityIs("CaptureActivity"));
-
+            PicRetangle retangle = new PicRetangle(351, 234, 558, 346);
+            if (DMThunder.FindPic(retangle, RSPath + "确定扫描登录.bmp"))
+                Tap(480, 290);
 
             Thread.Sleep(1000);
-            ScanQR();
+
+            damo = new DaMo();
+            while (!damo.BindWindow("TrayNoticeWindow", ""))
+            {
+                Thread.Sleep(1000);
+                Tap(45, 225);
+            }
+            damo.MoveTo(100, 110);
+            Thread.Sleep(800);
+            damo.Click();
+            damo.UnBind();
+            Thread.Sleep(500);
+
+            damo = new DaMo();
+            if (!damo.BindWindow("ldScreenshotWindow", ""))
+            {
+                ExecuteADB(ADBCommand.Back);
+                Thread.Sleep(3000);
+                ClickQR();
+            }
+            else
+            {
+                ScannerHWD = damo.GetWhd();
+                damo.UnBind();
+                ScanQR();
+            }
         }
 
         private void ScanQR()
         {
-            DaMo damo = new DaMo();
-            while (!damo.BindWindow("TrayNoticeWindow", ""))
-                Thread.Sleep(500);
-            damo.MoveTo(100, 110);
-            Thread.Sleep(500);
-            damo.Click();
-            damo.UnBind();
-            Thread.Sleep(2000);
-
-            while (!damo.BindWindow("ldScreenshotWindow", ""))
-                Thread.Sleep(500);
-
-            PicRetangle retangle = new PicRetangle(372, 326, 507, 421);
+            PicRetangle retangle = new PicRetangle(373, 321, 460, 409);
             if (DMDHXY.FindPic(retangle, RSPath + "二维码.bmp"))
             {
                 DMDHXY.ActiveWindows();
-                DMDHXY.ScanQR(damo);
+                DMDHXY.ScanQR(ScannerHWD);
 
                 retangle = new PicRetangle(351, 234, 558, 346);
+
+                int reset = 10, count = 0;
                 while (!DMThunder.FindPic(retangle, RSPath + "确定扫描登录.bmp"))
-                    Thread.Sleep(1000);
-                Tap(480, 290);
+                {
+                    Thread.Sleep(2000);
+                    count++;
+                    if (count == reset) break;
+                }
+                DMDHXY.StopScann();
+
+                //等待超时
+                if (reset == count)
+                {
+                    ExecuteADB(ADBCommand.Back);
+                    Thread.Sleep(3000);
+                    ClickQR();
+                }
+                else
+                    Tap(480, 290);
             }
         }
 
         private void StartGame()
         {
-            PicRetangle retangle = new PicRetangle(390, 602, 685, 681);
-            if (DMDHXY.FindPic(retangle, RSPath + "开始游戏.bmp"))
+            PicRetangle retangle = new PicRetangle(402, 612, 670, 680);
+            while (!DMDHXY.FindPic(retangle, RSPath + "开始游戏.bmp"))
             {
-                DMDHXY.MoveToFind();
-                Thread.Sleep(500);
-                DMDHXY.Click();
+                Thread.Sleep(1000);
             }
+            DMDHXY.MoveToFind();
+            DMDHXY.Click();
+            Thread.Sleep(200);
+            DMDHXY.Click();
         }
 
         private void CreateRole()
         {
 
-            PicRetangle retangle = new PicRetangle(805, 718, 933, 752);
+            PicRetangle retangle = new PicRetangle(803, 740, 1009, 786);
             if (DMDHXY.FindPic(retangle, RSPath + "创建角色.bmp"))
             {
                 DMDHXY.MoveToFind();
                 Thread.Sleep(500);
                 DMDHXY.Click();
 
-                retangle = new PicRetangle(805, 718, 933, 752);
-                while (DMDHXY.FindPic(retangle, RSPath + "老玩家.bmp"))
+                retangle = new PicRetangle(623, 291, 801, 473);
+                while (!DMDHXY.FindPic(retangle, RSPath + "老玩家.bmp"))
                     Thread.Sleep(1000);
+                DMDHXY.MoveToFind();
+                Thread.Sleep(500);
+                DMDHXY.Click();
             }
         }
         private void CloseThunder()
@@ -472,7 +511,7 @@ namespace DM
             dhxy = false;
         }
 
-        private void read_account_Click(object sender, EventArgs e)
+        private void Button_Read_Account_Click(object sender, EventArgs e)
         {
             OpenFileDialog dialog = new OpenFileDialog();
             dialog.Multiselect = true;//该值确定是否可以选择多个文件
@@ -499,8 +538,8 @@ namespace DM
                 //分离账号密码
                 str = str.Replace("----", " ");
                 string[] array = str.Split(' ');
-                if (!accounts.ContainsKey(array[0]))
-                    accounts.Add(array[0], array[1]);
+                if (!Accounts.ContainsKey(array[0]))
+                    Accounts.Add(array[0], array[1]);
                 str = sr.ReadLine();
             }
 
@@ -508,15 +547,40 @@ namespace DM
             fs.Close();
 
             //更新账号列表
-            foreach (KeyValuePair<string, string> item in accounts)
+            foreach (KeyValuePair<string, string> item in Accounts)
             {
-                account_list.Items.Add(new ListViewItem(new string[] { item.Key, item.Value, "" }));
+                ListView_Account.Items.Add(new ListViewItem(new string[] { item.Key, item.Value, "" }));
             }
         }
 
-        private void stop_button_Click(object sender, EventArgs e)
+        private void Button_Stop_Click(object sender, EventArgs e)
         {
             running = false;
+        }
+
+        private void ListView_Account_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                if (ListView_Account.SelectedIndices.Count > 0)
+                {
+                    SelectedIndex = ListView_Account.SelectedIndices[0];
+                    contextMenuStrip.Show(MousePosition.X, MousePosition.Y);
+                }
+            }
+        }
+
+        private void TSM_Execute_Click(object sender, EventArgs e)
+        {
+            if (!running && -1 != SelectedIndex)
+            {
+                Task.Run(() =>
+                {
+                    SingleProcess(SelectedIndex);
+                    SelectedIndex = -1;
+                });
+                running = true;
+            }
         }
     }
 }

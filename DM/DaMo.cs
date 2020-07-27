@@ -1,4 +1,5 @@
 ﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace DM
 {
@@ -15,6 +16,7 @@ namespace DM
         public int FindX = 0;
         public int FindY = 0;
 
+        bool scanning = false;
         public DaMo()
         {
             DMObeject = new Dm.dmsoft();
@@ -29,19 +31,23 @@ namespace DM
         public bool BindWindow(int hwd)
         {
             if (0 == hwd) return false;
-            int result = DMObeject.BindWindow(hwd, "normal", "normal", "normal", 0);
+            int result = DMObeject.BindWindow(hwd, "normal", "windows", "windows", 0);
             if (0 == result) return false;
             WindowHandle = hwd;
             SetHW();
             return true;
         }
-        public bool BindWindow(string className, string windowsName)
+        public bool BindWindow(string className, string windowsName, string mouseMode = "windows")
         {
             WindowHandle = DMObeject.FindWindow(className, windowsName);
             if (0 == WindowHandle) return false;
-            int result = DMObeject.BindWindow(WindowHandle, "normal", "normal", "normal", 0);
+            int result = DMObeject.BindWindow(WindowHandle, "normal", mouseMode, "windows", 0);
             SetHW();
             return 1 == result;
+        }
+        public int GetWhd()
+        {
+            return WindowHandle;
         }
         //获取当前窗口的宽高信息
         private void SetHW()
@@ -121,31 +127,63 @@ namespace DM
         {
             DMObeject.SetWindowState(WindowHandle, 1);
         }
+
+        [System.Runtime.InteropServices.DllImport("user32")]
+        private static extern int mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
+        //移动鼠标 
+        const int MOUSEEVENTF_MOVE = 0x0001;
+        //模拟鼠标左键按下 
+        const int MOUSEEVENTF_LEFTDOWN = 0x0002;
+        //模拟鼠标左键抬起 
+        const int MOUSEEVENTF_LEFTUP = 0x0004;
+        //标示是否采用绝对坐标 
+        const int MOUSEEVENTF_ABSOLUTE = 0x8000;
+
         //扫描二维码
-        public void ScanQR(DaMo dm)
+        public void ScanQR(int ScannerHWD)
         {
             DMObeject.GetWindowRect(WindowHandle,
                 out object IntX0, out object IntY0, out object IntX1, out object IntY1);
 
-            int aimX = (int)IntX0 + 340;
+            int aimX = (int)IntX0 + 250;
             int aimY = (int)IntY0 + 250;
-            dm.ActiveWindows();
-            DMObeject.MoveWindow(dm.WindowHandle, aimX, aimY);
+            ActiveWindows();
+            DMObeject.MoveWindow(ScannerHWD, aimX, aimY);
 
-
-            dm.ActiveWindows();
-            dm.UnBind();
-            Thread.Sleep(500);
-
+            Thread.Sleep(800);
+            DMObeject.SetWindowState(ScannerHWD, 1);
             DMObeject.MoveTo(aimX + 240, aimY + 15);
-            DMObeject.LeftDown();
-            for (int i = 1; i < 30; i++)
-            {
-                Thread.Sleep(80);
-                DMObeject.MoveR(-1, 0);
-            }
-            DMObeject.LeftUp();
+            //DMObeject.MoveTo(240, 15);
 
+            scanning = true;
+
+            Task.Run(() =>
+            {
+                int c = 1, max = 90;
+                while (scanning)
+                {
+                    //DMObeject.SetWindowState(ScannerHWD, 1);
+                    DMObeject.LeftDown();
+                   // mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                    for (int i = 0; (i <= max) && scanning; i++)
+                    {
+
+                        //DMObeject.MoveTo(aimX + 240 + c * i, aimY + 15);
+                        Thread.Sleep(5);
+                        //mouse_event(MOUSEEVENTF_MOVE, c, 0, 0, 0);
+                        DMObeject.MoveR(c, 0);
+                        //DMObeject.MoveWindow(WindowHandle, i, 0);
+                    }
+                    c = -c;
+                    //mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                    DMObeject.LeftUp();
+                }
+                MoveWindowsLT();
+            });
+        }
+        public void StopScann()
+        {
+            scanning = false;
         }
 
         public void MoveWindowsLT()
@@ -157,7 +195,7 @@ namespace DM
         public void MoveWindowsRT()
         {
             Dm.dmsoft dm = new Dm.dmsoft();
-            dm.MoveWindow(WindowHandle, 1920 - width, 0);
+            dm.MoveWindow(WindowHandle, dm.GetScreenWidth() - width, 0);
         }
 
         public void CloseWindows()
@@ -166,12 +204,6 @@ namespace DM
             DMObeject.SetWindowState(WindowHandle, 13);
             //窗口句柄重置
             WindowHandle = 0;
-        }
-
-        public void SetWindowsSize(int width, int heigth)
-        {
-            DMObeject.SetWindowSize(WindowHandle, width, heigth);
-            SetHW();
         }
 
         public void UnBind()
