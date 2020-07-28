@@ -41,7 +41,11 @@ namespace DM
         {
             WindowHandle = DMObeject.FindWindow(className, windowsName);
             if (0 == WindowHandle) return false;
-            int result = DMObeject.BindWindow(WindowHandle, "normal", mouseMode, "windows", 0);
+
+            Thread.Sleep(2000);
+            ActiveWindows();
+
+            int result = DMObeject.BindWindow(WindowHandle, "normal", mouseMode, "windows",0);
             SetHW();
             return 1 == result;
         }
@@ -152,17 +156,18 @@ namespace DM
 
             Thread.Sleep(800);
             DMObeject.SetWindowState(ScannerHWD, 1);
-            DMObeject.MoveTo(aimX + 240, aimY + 15);
-            //DMObeject.MoveTo(240, 15);
+            //DMObeject.MoveTo(aimX + 240, aimY + 15);
+            DMObeject.MoveTo(240, 15);
 
             scanning = true;
 
             Task.Run(() =>
             {
+                
                 int c = 1, max = 90;
                 while (scanning)
                 {
-                    //DMObeject.SetWindowState(ScannerHWD, 1);
+                    Dm.dmsoft d = new Dm.dmsoft();
                     DMObeject.LeftDown();
                    // mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
                     for (int i = 0; (i <= max) && scanning; i++)
@@ -172,8 +177,10 @@ namespace DM
                         Thread.Sleep(5);
                         //mouse_event(MOUSEEVENTF_MOVE, c, 0, 0, 0);
                         DMObeject.MoveR(c, 0);
-                        //DMObeject.MoveWindow(WindowHandle, i, 0);
+                        d.MoveWindow(ScannerHWD, aimX + i, aimY);
                     }
+                    d.SetWindowState(ScannerHWD, 1);
+                    Thread.Sleep(50);
                     c = -c;
                     //mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
                     DMObeject.LeftUp();

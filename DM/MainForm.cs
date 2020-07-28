@@ -169,8 +169,6 @@ namespace DM
 
             while (!DMDHXY.BindWindow("大话西游手游", "大话西游手游", "normal"))
                 Thread.Sleep(2000);
-
-            DMDHXY.ActiveWindows();
         }
         private bool FrontActivityIs(string activity)
         {
